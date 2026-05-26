@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { CSSProperties, FormEvent } from 'react'
+import type { FormEvent } from 'react'
 import {
   Avatar,
   Badge,
@@ -115,33 +115,6 @@ const API_BASE = 'https://overfast-api.tekrop.fr'
 const INITIAL_TAG = 'TeKrop#2217'
 const PROFILE_CACHE_KEY = 'overwatch-profile-cache-v1'
 const LAST_PROFILE_KEY = 'overwatch-last-profile-v1'
-
-const shellBackground: CSSProperties = {
-  minHeight: '100vh',
-  background:
-    'radial-gradient(circle at top, rgba(255, 209, 102, 0.28), transparent 28%), linear-gradient(180deg, #fbf8f3 0%, #f3efe7 100%)',
-}
-
-const stickyHeaderStyle: CSSProperties = {
-  position: 'sticky',
-  top: 0,
-  zIndex: 40,
-  backdropFilter: 'blur(14px)',
-  background:
-    'linear-gradient(180deg, rgba(251, 248, 243, 0.94), rgba(243, 239, 231, 0.88))',
-  borderBottom: '1px solid rgba(33, 43, 63, 0.12)',
-}
-
-const headerCardStyle: CSSProperties = {
-  background:
-    'radial-gradient(circle at top left, rgba(255, 140, 66, 0.18), transparent 34%), radial-gradient(circle at bottom right, rgba(50, 113, 255, 0.12), transparent 32%), rgba(255, 252, 247, 0.88)',
-  border: '1px solid rgba(33, 43, 63, 0.1)',
-}
-
-const lookupPanelStyle: CSSProperties = {
-  background: 'rgba(12, 16, 28, 0.72)',
-  color: '#f4f7fb',
-}
 
 function normalizeBattleTag(value: string) {
   return value.trim().replace('#', '-')
@@ -348,7 +321,7 @@ function readLastProfile() {
 
 function SectionLabel({ children }: { children: string }) {
   return (
-    <Text c="orange.7" tt="uppercase" fw={600} fz="0.72rem" style={{ letterSpacing: '0.14em' }}>
+    <Text c="dimmed" tt="uppercase" fw={600} fz="xs">
       {children}
     </Text>
   )
@@ -356,11 +329,11 @@ function SectionLabel({ children }: { children: string }) {
 
 function MetricCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <Paper radius="xl" p="lg" bg="rgba(248, 242, 232, 0.9)" withBorder>
-      <Text c="dimmed" tt="uppercase" fw={600} fz="0.72rem" style={{ letterSpacing: '0.12em' }}>
+    <Paper withBorder p="lg" radius="md">
+      <Text c="dimmed" tt="uppercase" fw={600} fz="xs">
         {label}
       </Text>
-      <Title order={3} mt={10} ff="Georgia, serif">
+      <Title order={3} mt="sm">
         {value}
       </Title>
       {hint ? (
@@ -414,15 +387,15 @@ function App() {
   }
 
   return (
-    <Box style={shellBackground}>
-      <Box style={stickyHeaderStyle}>
-        <Container size="xl" py="md">
-          <Paper radius="28px" p="lg" style={headerCardStyle}>
+    <Box py="md">
+      <Box>
+        <Container size="xl">
+          <Paper withBorder p="lg" radius="md">
             <Grid align="center" gap="lg">
               <Grid.Col span={{ base: 12, md: 4 }}>
                 <Stack gap={4}>
                   <SectionLabel>Overwatch Performance Tracker</SectionLabel>
-                  <Title order={2} ff="Georgia, serif">
+                  <Title order={2}>
                     Overwatch career lookup
                   </Title>
                   <Text c="dimmed">Live public profile stats for any BattleTag.</Text>
@@ -430,10 +403,10 @@ function App() {
               </Grid.Col>
 
               <Grid.Col span={{ base: 12, md: 8 }}>
-                <Paper radius="24px" p="md" style={lookupPanelStyle}>
+                <Paper withBorder p="md" radius="md">
                   <form onSubmit={handleSubmit}>
                     <Stack gap="xs">
-                      <Text c="gray.3" tt="uppercase" fw={700} fz="0.75rem" style={{ letterSpacing: '0.14em' }}>
+                      <Text c="dimmed" tt="uppercase" fw={600} fz="xs">
                         BattleTag
                       </Text>
                       <Group align="end" wrap="nowrap">
@@ -442,30 +415,17 @@ function App() {
                           onChange={(event) => setInputValue(event.currentTarget.value)}
                           placeholder="Player#1234"
                           size="md"
-                          radius="xl"
-                          styles={{
-                            input: {
-                              background: 'rgba(255,255,255,0.08)',
-                              color: '#f4f7fb',
-                              borderColor: 'rgba(255,255,255,0.14)',
-                            },
-                          }}
                           style={{ flex: 1 }}
                         />
                         <Button
                           type="submit"
                           size="md"
-                          radius="xl"
                           loading={status === 'loading'}
-                          color="orange"
-                          variant="gradient"
-                          gradient={{ from: '#ffd166', to: '#ff8c42', deg: 135 }}
-                          styles={{ label: { color: '#08111c', fontWeight: 800 } }}
                         >
                           Load stats
                         </Button>
                       </Group>
-                      <Text c="gray.4" fz="sm" lh={1.4}>
+                      <Text c="dimmed" fz="sm">
                         The profile must be public in Overwatch. BattleTags can be typed with either `#` or `-`.
                       </Text>
                     </Stack>
@@ -480,10 +440,10 @@ function App() {
       <Container size="xl" py="xl">
         <Stack gap="xl">
           {status === 'error' ? (
-            <Paper radius="28px" p="xl" withBorder shadow="sm">
+            <Paper p="xl" withBorder radius="md">
               <Stack gap="xs">
                 <SectionLabel>Lookup Issue</SectionLabel>
-                <Title order={2} ff="Georgia, serif">
+                <Title order={2}>
                   Couldn&apos;t load that profile
                 </Title>
                 <Text c="dimmed">{errorMessage}</Text>
@@ -492,10 +452,10 @@ function App() {
           ) : null}
 
           {status === 'idle' ? (
-            <Paper radius="28px" p="xl" withBorder shadow="sm">
+            <Paper p="xl" withBorder radius="md">
               <Stack gap="xs">
                 <SectionLabel>Ready</SectionLabel>
-                <Title order={2} ff="Georgia, serif">
+                <Title order={2}>
                   Search a public Overwatch profile
                 </Title>
                 <Text c="dimmed">Try the prefilled sample or enter your own BattleTag to load real competitive stats.</Text>
@@ -504,10 +464,10 @@ function App() {
           ) : null}
 
           {status === 'loading' && !profile ? (
-            <Paper radius="28px" p="xl" withBorder shadow="sm">
+            <Paper p="xl" withBorder radius="md">
               <Stack gap="xs">
                 <SectionLabel>Loading</SectionLabel>
-                <Title order={2} ff="Georgia, serif">
+                <Title order={2}>
                   Pulling live career data
                 </Title>
                 <Text c="dimmed">Searching the BattleTag, then loading the public competitive summary and hero splits.</Text>
@@ -518,12 +478,12 @@ function App() {
           {profile ? (
             <>
               <SimpleGrid cols={{ base: 1, md: 3 }} spacing="lg">
-                <Paper radius="28px" p="xl" shadow="sm" withBorder style={{ background: 'linear-gradient(135deg, rgba(255, 209, 102, 0.22), rgba(255, 140, 66, 0.1)), rgba(255, 252, 247, 0.9)' }}>
+                <Paper p="xl" withBorder radius="md">
                   <Group align="center" wrap="nowrap">
-                    <Avatar src={profile.avatar} size={76} radius="xl" />
+                    <Avatar src={profile.avatar} size={76} radius="md" />
                     <Stack gap={4}>
                       <SectionLabel>BattleTag</SectionLabel>
-                      <Title order={3} ff="Georgia, serif">
+                      <Title order={3}>
                         {profile.battleTag}
                       </Title>
                       <Text c="dimmed">{profile.title ?? 'No player title equipped'}</Text>
@@ -537,10 +497,10 @@ function App() {
                   hint={`Main role by playtime: ${profile.headlineRole}`}
                 />
 
-                <Paper radius="28px" p="xl" shadow="sm" withBorder>
+                <Paper p="xl" withBorder radius="md">
                   <Stack gap={4}>
                     <SectionLabel>Profile Snapshot</SectionLabel>
-                    <Title order={3} ff="Georgia, serif">
+                    <Title order={3}>
                       Endorsement {profile.endorsementLevel}
                     </Title>
                     <Text c="dimmed" fz="sm">
@@ -555,12 +515,12 @@ function App() {
 
               <Grid gap="lg">
                 <Grid.Col span={{ base: 12, lg: 7 }}>
-                  <Paper radius="28px" p="xl" withBorder shadow="sm">
+                  <Paper p="xl" withBorder radius="md">
                     <Stack gap="lg">
                       <Group justify="space-between" align="start">
                         <div>
                           <SectionLabel>Competitive Summary</SectionLabel>
-                          <Title order={2} ff="Georgia, serif">
+                          <Title order={2}>
                             Live profile snapshot
                           </Title>
                         </div>
@@ -582,11 +542,11 @@ function App() {
                 </Grid.Col>
 
                 <Grid.Col span={{ base: 12, lg: 5 }}>
-                  <Paper radius="28px" p="xl" withBorder shadow="sm">
+                  <Paper p="xl" withBorder radius="md">
                     <Stack gap="lg">
                       <div>
                         <SectionLabel>Current Comp Ranks</SectionLabel>
-                        <Title order={2} ff="Georgia, serif">
+                        <Title order={2}>
                           Queue placements
                         </Title>
                       </div>
@@ -603,12 +563,12 @@ function App() {
 
               <Grid gap="lg">
                 <Grid.Col span={{ base: 12, lg: 7 }}>
-                  <Paper radius="28px" p="xl" withBorder shadow="sm">
+                  <Paper p="xl" withBorder radius="md">
                     <Stack gap="lg">
                       <Group justify="space-between" align="start">
                         <div>
                           <SectionLabel>Role Splits</SectionLabel>
-                          <Title order={2} ff="Georgia, serif">
+                          <Title order={2}>
                             Where the games go
                           </Title>
                         </div>
@@ -648,23 +608,23 @@ function App() {
                 </Grid.Col>
 
                 <Grid.Col span={{ base: 12, lg: 5 }}>
-                  <Paper radius="28px" p="xl" withBorder shadow="sm">
+                  <Paper p="xl" withBorder radius="md">
                     <Stack gap="lg">
                       <div>
                         <SectionLabel>Top Heroes</SectionLabel>
-                        <Title order={2} ff="Georgia, serif">
+                        <Title order={2}>
                           Most played picks
                         </Title>
                       </div>
 
                       <Stack gap="md">
                         {profile.heroRows.map((row) => (
-                          <Paper key={row.hero} radius="xl" p="lg" bg="rgba(248, 242, 232, 0.9)" withBorder>
+                          <Paper key={row.hero} p="lg" withBorder radius="md">
                             <Stack gap={6}>
-                              <Text c="dimmed" tt="uppercase" fw={600} fz="0.72rem" style={{ letterSpacing: '0.12em' }}>
+                              <Text c="dimmed" tt="uppercase" fw={600} fz="xs">
                                 {row.hero}
                               </Text>
-                              <Title order={3} ff="Georgia, serif">
+                              <Title order={3}>
                                 {formatSeconds(row.bucket.timePlayed)}
                               </Title>
                               <Text c="dimmed" fz="sm">
@@ -679,12 +639,12 @@ function App() {
                 </Grid.Col>
               </Grid>
 
-              <Paper radius="28px" p="xl" withBorder shadow="sm">
+              <Paper p="xl" withBorder radius="md">
                 <Stack gap="lg">
                   <Group justify="space-between" align="start">
                     <div>
                       <SectionLabel>Overall Totals</SectionLabel>
-                      <Title order={2} ff="Georgia, serif">
+                      <Title order={2}>
                         Competitive output
                       </Title>
                     </div>
