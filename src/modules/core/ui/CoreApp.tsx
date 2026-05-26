@@ -176,29 +176,25 @@ function RoleSplitTable({
 
 function WinRateRail({ winrate }: { winrate: number }) {
   const clampedWinrate = Math.max(0, Math.min(100, winrate));
-
+  const accentColor = clampedWinrate < 50 ? "#e03131" : "#2b8a3e";
   return (
-    <Paper withBorder p="md" radius="md" mt="sm">
-      <Stack gap="xs">
-        <Group justify="space-between">
-          <SectionLabel>Win Rate</SectionLabel>
-          <Text fw={600}>{clampedWinrate.toFixed(1)}%</Text>
-        </Group>
-
+    <Paper p="md" radius="md" mt="sm">
+      <Stack gap="0">
+        <SectionLabel>Win Rate</SectionLabel>
         <Box pos="relative" pt="lg" pb="xs">
           <Box h={8} bg="gray.2" style={{ borderRadius: 999 }} />
           <Box
             pos="absolute"
-            top={0}
+            top={-20}
             left={`clamp(0%, calc(${clampedWinrate}% - 28px), calc(100% - 56px))`}
           >
             <Stack gap={4} align="center">
               <Paper withBorder px="xs" py={4} radius="sm">
-                <Text fz="sm" fw={700}>
+                <Text fz="sm" fw={700} c={accentColor}>
                   {clampedWinrate.toFixed(1)}%
                 </Text>
               </Paper>
-              <Box w={2} h={18} bg="blue.6" />
+              <Box w={2} h={18} style={{ backgroundColor: accentColor }} />
             </Stack>
           </Box>
           <Group justify="space-between" mt="sm">
