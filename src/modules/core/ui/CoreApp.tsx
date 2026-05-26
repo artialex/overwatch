@@ -139,6 +139,52 @@ function RoleSplitTable({
   )
 }
 
+function WinRateRail({ winrate }: { winrate: number }) {
+  const clampedWinrate = Math.max(0, Math.min(100, winrate))
+
+  return (
+    <Paper withBorder p="lg" radius="md" mt="md">
+      <Stack gap="xs">
+        <Group justify="space-between">
+          <SectionLabel>Win Rate</SectionLabel>
+          <Text fw={600}>{clampedWinrate.toFixed(1)}%</Text>
+        </Group>
+
+        <Box pos="relative" pt="lg" pb="xs">
+          <Box h={8} bg="gray.2" style={{ borderRadius: 999 }} />
+
+          <Box
+            pos="absolute"
+            top={0}
+            left={`clamp(0%, calc(${clampedWinrate}% - 28px), calc(100% - 56px))`}
+          >
+            <Stack gap={4} align="center">
+              <Paper withBorder px="xs" py={4} radius="sm">
+                <Text fz="sm" fw={700}>
+                  {clampedWinrate.toFixed(1)}%
+                </Text>
+              </Paper>
+              <Box w={2} h={18} bg="blue.6" />
+            </Stack>
+          </Box>
+
+          <Group justify="space-between" mt="md">
+            <Text c="dimmed" fz="xs">
+              0%
+            </Text>
+            <Text c="dimmed" fz="xs">
+              50%
+            </Text>
+            <Text c="dimmed" fz="xs">
+              100%
+            </Text>
+          </Group>
+        </Box>
+      </Stack>
+    </Paper>
+  )
+}
+
 export function CoreApp() {
   const {
     errorMessage,
@@ -197,6 +243,8 @@ export function CoreApp() {
             </Grid.Col>
           </Grid>
         </Paper>
+
+        {profile ? <WinRateRail winrate={profile.general.winrate} /> : null}
       </Container>
 
       <Container size="xl" py="xl">
