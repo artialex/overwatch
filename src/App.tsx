@@ -1,17 +1,32 @@
 import { useState } from 'react'
-import type { FormEvent } from 'react'
-import './App.css'
+import type { CSSProperties, FormEvent } from 'react'
+import {
+  Avatar,
+  Badge,
+  Box,
+  Button,
+  Container,
+  Grid,
+  Group,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core'
 
 type RoleKey = 'tank' | 'damage' | 'support' | 'open'
 
 type SearchResponse = {
   total: number
   results: Array<{
-    player_id: string
+    playerId: string
     name: string
     avatar: string
     title: string | null
-    is_public: boolean
+    isPublic: boolean
   }>
 }
 
@@ -44,14 +59,14 @@ type SummaryResponse = {
       open: RankInfo | null
     } | null
   }
-  last_updated_at: number
+  lastUpdatedAt: number
 }
 
 type StatsBucket = {
-  games_played: number
-  games_won: number
-  games_lost: number
-  time_played: number
+  gamesPlayed: number
+  gamesWon: number
+  gamesLost: number
+  timePlayed: number
   winrate: number
   kda: number
   total: {
@@ -94,12 +109,39 @@ type ProfileView = {
   cachedAt: number
 }
 
+type CachedProfiles = Record<string, ProfileView>
+
 const API_BASE = 'https://overfast-api.tekrop.fr'
 const INITIAL_TAG = 'TeKrop#2217'
 const PROFILE_CACHE_KEY = 'overwatch-profile-cache-v1'
 const LAST_PROFILE_KEY = 'overwatch-last-profile-v1'
 
-type CachedProfiles = Record<string, ProfileView>
+const shellBackground: CSSProperties = {
+  minHeight: '100vh',
+  background:
+    'radial-gradient(circle at top, rgba(255, 209, 102, 0.28), transparent 28%), linear-gradient(180deg, #fbf8f3 0%, #f3efe7 100%)',
+}
+
+const stickyHeaderStyle: CSSProperties = {
+  position: 'sticky',
+  top: 0,
+  zIndex: 40,
+  backdropFilter: 'blur(14px)',
+  background:
+    'linear-gradient(180deg, rgba(251, 248, 243, 0.94), rgba(243, 239, 231, 0.88))',
+  borderBottom: '1px solid rgba(33, 43, 63, 0.12)',
+}
+
+const headerCardStyle: CSSProperties = {
+  background:
+    'radial-gradient(circle at top left, rgba(255, 140, 66, 0.18), transparent 34%), radial-gradient(circle at bottom right, rgba(50, 113, 255, 0.12), transparent 32%), rgba(255, 252, 247, 0.88)',
+  border: '1px solid rgba(33, 43, 63, 0.1)',
+}
+
+const lookupPanelStyle: CSSProperties = {
+  background: 'rgba(12, 16, 28, 0.72)',
+  color: '#f4f7fb',
+}
 
 function normalizeBattleTag(value: string) {
   return value.trim().replace('#', '-')
@@ -142,7 +184,7 @@ function formatClientDate(timestamp: number) {
 function pickHeadlineRole(roles: Partial<Record<RoleKey, StatsBucket>>) {
   const ordered = Object.entries(roles)
     .filter((entry): entry is [RoleKey, StatsBucket] => Boolean(entry[1]))
-    .sort((left, right) => right[1].time_played - left[1].time_played)
+    .sort((left, right) => right[1].timePlayed - left[1].timePlayed)
 
   if (ordered.length === 0) {
     return 'No role data yet'
@@ -152,10 +194,7 @@ function pickHeadlineRole(roles: Partial<Record<RoleKey, StatsBucket>>) {
 }
 
 function buildSummary(username: string, general: StatsBucket, headlineRole: string) {
-  const games = general.games_played
-  const winrate = general.winrate.toFixed(1)
-  const kda = general.kda.toFixed(2)
-  return `${username} has ${games} competitive games tracked on the selected profile snapshot, a ${winrate}% win rate, and a ${kda} KDA. Most playtime currently sits on ${headlineRole.toLowerCase()}.`
+  return `${username} has ${general.gamesPlayed} competitive games tracked on the selected profile snapshot, a ${general.winrate.toFixed(1)}% win rate, and a ${general.kda.toFixed(2)} KDA. Most playtime currently sits on ${headlineRole.toLowerCase()}.`
 }
 
 function heroLabel(hero: string) {
@@ -165,6 +204,25 @@ function heroLabel(hero: string) {
     .join(' ')
 }
 
+function toCamelCase(value: string) {
+  return value.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase())
+}
+
+function camelizeKeys<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => camelizeKeys(item)) as T
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.entries(value).reduce<Record<string, unknown>>((result, [key, nestedValue]) => {
+      result[toCamelCase(key)] = camelizeKeys(nestedValue)
+      return result
+    }, {}) as T
+  }
+
+  return value
+}
+
 async function fetchJson<T>(path: string) {
   const response = await fetch(`${API_BASE}${path}`)
 
@@ -172,7 +230,7 @@ async function fetchJson<T>(path: string) {
     throw new Error(`API request failed with ${response.status}`)
   }
 
-  return (await response.json()) as T
+  return camelizeKeys((await response.json()) as T)
 }
 
 async function loadProfile(rawBattleTag: string): Promise<ProfileView> {
@@ -183,19 +241,19 @@ async function loadProfile(rawBattleTag: string): Promise<ProfileView> {
   }
 
   const search = await fetchJson<SearchResponse>(`/players?name=${encodeURIComponent(lookup)}`)
-  const candidate = search.results.find((result) => result.player_id.toLowerCase() === lookup.toLowerCase()) ?? search.results[0]
+  const candidate = search.results.find((result) => result.playerId.toLowerCase() === lookup.toLowerCase()) ?? search.results[0]
 
   if (!candidate) {
     throw new Error('No public Overwatch profile was found for that BattleTag.')
   }
 
-  if (!candidate.is_public) {
+  if (!candidate.isPublic) {
     throw new Error('That profile is private. Set the Overwatch career profile to public and try again.')
   }
 
   const [summary, stats] = await Promise.all([
-    fetchJson<SummaryResponse>(`/players/${encodeURIComponent(candidate.player_id)}/summary`),
-    fetchJson<StatsSummaryResponse>(`/players/${encodeURIComponent(candidate.player_id)}/stats/summary?gamemode=competitive&platform=pc`),
+    fetchJson<SummaryResponse>(`/players/${encodeURIComponent(candidate.playerId)}/summary`),
+    fetchJson<StatsSummaryResponse>(`/players/${encodeURIComponent(candidate.playerId)}/stats/summary?gamemode=competitive&platform=pc`),
   ])
 
   const currentPlatform = summary.competitive.pc ?? summary.competitive.console
@@ -208,25 +266,25 @@ async function loadProfile(rawBattleTag: string): Promise<ProfileView> {
 
   const roleRows = Object.entries(stats.roles)
     .filter((entry): entry is [RoleKey, StatsBucket] => Boolean(entry[1]))
-    .sort((left, right) => right[1].time_played - left[1].time_played)
+    .sort((left, right) => right[1].timePlayed - left[1].timePlayed)
     .map(([role, bucket]) => ({ role: titleCase(role), bucket }))
 
   const heroRows = Object.entries(stats.heroes)
-    .filter((entry) => entry[1].time_played > 0)
-    .sort((left, right) => right[1].time_played - left[1].time_played)
+    .filter((entry) => entry[1].timePlayed > 0)
+    .sort((left, right) => right[1].timePlayed - left[1].timePlayed)
     .slice(0, 6)
     .map(([hero, bucket]) => ({ hero: heroLabel(hero), bucket }))
 
   const headlineRole = pickHeadlineRole(stats.roles)
 
   return {
-    battleTag: formatBattleTag(candidate.player_id),
+    battleTag: formatBattleTag(candidate.playerId),
     username: summary.username,
-    playerId: candidate.player_id,
+    playerId: candidate.playerId,
     avatar: summary.avatar || candidate.avatar,
     title: summary.title,
     endorsementLevel: summary.endorsement.level,
-    lastUpdatedAt: summary.last_updated_at,
+    lastUpdatedAt: summary.lastUpdatedAt,
     currentSeason: currentPlatform?.season ?? null,
     currentRanks,
     headlineRole,
@@ -245,11 +303,7 @@ function readProfileCache() {
 
   try {
     const rawCache = window.localStorage.getItem(PROFILE_CACHE_KEY)
-    if (!rawCache) {
-      return {}
-    }
-
-    return JSON.parse(rawCache) as CachedProfiles
+    return rawCache ? camelizeKeys(JSON.parse(rawCache) as CachedProfiles) : {}
   } catch {
     return {}
   }
@@ -292,12 +346,39 @@ function readLastProfile() {
   return readProfileCache()[lastProfileKey.toLowerCase()] ?? null
 }
 
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <Text c="orange.7" tt="uppercase" fw={600} fz="0.72rem" style={{ letterSpacing: '0.14em' }}>
+      {children}
+    </Text>
+  )
+}
+
+function MetricCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <Paper radius="xl" p="lg" bg="rgba(248, 242, 232, 0.9)" withBorder>
+      <Text c="dimmed" tt="uppercase" fw={600} fz="0.72rem" style={{ letterSpacing: '0.12em' }}>
+        {label}
+      </Text>
+      <Title order={3} mt={10} ff="Georgia, serif">
+        {value}
+      </Title>
+      {hint ? (
+        <Text c="dimmed" fz="sm" mt={8}>
+          {hint}
+        </Text>
+      ) : null}
+    </Paper>
+  )
+}
+
 function App() {
-  const [inputValue, setInputValue] = useState(() => readLastProfile()?.battleTag ?? INITIAL_TAG)
-  const [profile, setProfile] = useState<ProfileView | null>(() => readLastProfile())
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>(() => (readLastProfile() ? 'success' : 'idle'))
+  const initialProfile = readLastProfile()
+  const [inputValue, setInputValue] = useState(() => initialProfile?.battleTag ?? INITIAL_TAG)
+  const [profile, setProfile] = useState<ProfileView | null>(() => initialProfile)
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>(() => (initialProfile ? 'success' : 'idle'))
   const [errorMessage, setErrorMessage] = useState('')
-  const [isCachedProfile, setIsCachedProfile] = useState(() => Boolean(readLastProfile()))
+  const [isCachedProfile, setIsCachedProfile] = useState(() => Boolean(initialProfile))
 
   async function runLookup(battleTag: string) {
     setStatus('loading')
@@ -333,246 +414,330 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
-      <section className="hero-panel">
-        <div className="hero-copy">
-          <p className="eyebrow">Overwatch performance tracker</p>
-          <h1>Overwatch career lookup</h1>
-          <p className="hero-text">
-            Live public profile stats for any BattleTag.
-          </p>
-        </div>
+    <Box style={shellBackground}>
+      <Box style={stickyHeaderStyle}>
+        <Container size="xl" py="md">
+          <Paper radius="28px" p="lg" style={headerCardStyle}>
+            <Grid align="center" gap="lg">
+              <Grid.Col span={{ base: 12, md: 4 }}>
+                <Stack gap={4}>
+                  <SectionLabel>Overwatch Performance Tracker</SectionLabel>
+                  <Title order={2} ff="Georgia, serif">
+                    Overwatch career lookup
+                  </Title>
+                  <Text c="dimmed">Live public profile stats for any BattleTag.</Text>
+                </Stack>
+              </Grid.Col>
 
-        <form className="search-panel" onSubmit={handleSubmit}>
-          <label className="field-label" htmlFor="battletag">
-            BattleTag
-          </label>
-          <div className="field-row">
-            <input
-              id="battletag"
-              name="battletag"
-              type="text"
-              value={inputValue}
-              onChange={(event) => setInputValue(event.target.value)}
-              placeholder="Player#1234"
-              autoComplete="off"
-            />
-            <button type="submit" disabled={status === 'loading'}>
-              {status === 'loading' ? 'Loading...' : 'Load stats'}
-            </button>
-          </div>
-          <p className="field-hint">The profile must be public in Overwatch. BattleTags can be typed with either `#` or `-`.</p>
-        </form>
-      </section>
+              <Grid.Col span={{ base: 12, md: 8 }}>
+                <Paper radius="24px" p="md" style={lookupPanelStyle}>
+                  <form onSubmit={handleSubmit}>
+                    <Stack gap="xs">
+                      <Text c="gray.3" tt="uppercase" fw={700} fz="0.75rem" style={{ letterSpacing: '0.14em' }}>
+                        BattleTag
+                      </Text>
+                      <Group align="end" wrap="nowrap">
+                        <TextInput
+                          value={inputValue}
+                          onChange={(event) => setInputValue(event.currentTarget.value)}
+                          placeholder="Player#1234"
+                          size="md"
+                          radius="xl"
+                          styles={{
+                            input: {
+                              background: 'rgba(255,255,255,0.08)',
+                              color: '#f4f7fb',
+                              borderColor: 'rgba(255,255,255,0.14)',
+                            },
+                          }}
+                          style={{ flex: 1 }}
+                        />
+                        <Button
+                          type="submit"
+                          size="md"
+                          radius="xl"
+                          loading={status === 'loading'}
+                          color="orange"
+                          variant="gradient"
+                          gradient={{ from: '#ffd166', to: '#ff8c42', deg: 135 }}
+                          styles={{ label: { color: '#08111c', fontWeight: 800 } }}
+                        >
+                          Load stats
+                        </Button>
+                      </Group>
+                      <Text c="gray.4" fz="sm" lh={1.4}>
+                        The profile must be public in Overwatch. BattleTags can be typed with either `#` or `-`.
+                      </Text>
+                    </Stack>
+                  </form>
+                </Paper>
+              </Grid.Col>
+            </Grid>
+          </Paper>
+        </Container>
+      </Box>
 
-      {status === 'error' ? (
-        <section className="panel message-panel">
-          <p className="eyebrow">Lookup issue</p>
-          <h2>Couldn&apos;t load that profile</h2>
-          <p className="panel-note">{errorMessage}</p>
-        </section>
-      ) : status === 'idle' ? (
-        <section className="panel message-panel">
-          <p className="eyebrow">Ready</p>
-          <h2>Search a public Overwatch profile</h2>
-          <p className="panel-note">Try the prefilled sample or enter your own BattleTag to load real competitive stats.</p>
-        </section>
-      ) : null}
+      <Container size="xl" py="xl">
+        <Stack gap="xl">
+          {status === 'error' ? (
+            <Paper radius="28px" p="xl" withBorder shadow="sm">
+              <Stack gap="xs">
+                <SectionLabel>Lookup Issue</SectionLabel>
+                <Title order={2} ff="Georgia, serif">
+                  Couldn&apos;t load that profile
+                </Title>
+                <Text c="dimmed">{errorMessage}</Text>
+              </Stack>
+            </Paper>
+          ) : null}
 
-      {profile ? (
-        <>
-          <section className="summary-grid">
-            <article className="stat-card featured">
-              <div className="identity-row">
-                <img className="avatar" src={profile.avatar} alt="" />
-                <div>
-                  <span className="stat-label">BattleTag</span>
-                  <strong>{profile.battleTag}</strong>
-                  <p>{profile.title ?? 'No player title equipped'}</p>
-                </div>
-              </div>
-            </article>
-            <article className="stat-card">
-              <span className="stat-label">Current season</span>
-              <strong>{profile.currentSeason ? `Season ${profile.currentSeason}` : 'Unavailable'}</strong>
-              <p>Main role by playtime: {profile.headlineRole}</p>
-            </article>
-            <article className="stat-card">
-              <span className="stat-label">Profile snapshot</span>
-              <strong>Endorsement {profile.endorsementLevel}</strong>
-              <p>Last updated: {formatDate(profile.lastUpdatedAt)}</p>
-              <p>{isCachedProfile ? `Loaded from cache at ${formatClientDate(profile.cachedAt)}` : 'Loaded fresh from the live profile API'}</p>
-            </article>
-          </section>
+          {status === 'idle' ? (
+            <Paper radius="28px" p="xl" withBorder shadow="sm">
+              <Stack gap="xs">
+                <SectionLabel>Ready</SectionLabel>
+                <Title order={2} ff="Georgia, serif">
+                  Search a public Overwatch profile
+                </Title>
+                <Text c="dimmed">Try the prefilled sample or enter your own BattleTag to load real competitive stats.</Text>
+              </Stack>
+            </Paper>
+          ) : null}
 
-          <section className="content-grid">
-            <article className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Competitive summary</p>
-                  <h2>Live profile snapshot</h2>
-                </div>
-                <p className="panel-note">PC competitive stats from the public career profile.</p>
-              </div>
+          {status === 'loading' && !profile ? (
+            <Paper radius="28px" p="xl" withBorder shadow="sm">
+              <Stack gap="xs">
+                <SectionLabel>Loading</SectionLabel>
+                <Title order={2} ff="Georgia, serif">
+                  Pulling live career data
+                </Title>
+                <Text c="dimmed">Searching the BattleTag, then loading the public competitive summary and hero splits.</Text>
+              </Stack>
+            </Paper>
+          ) : null}
 
-              <p className="lead-copy">{profile.summary}</p>
+          {profile ? (
+            <>
+              <SimpleGrid cols={{ base: 1, md: 3 }} spacing="lg">
+                <Paper radius="28px" p="xl" shadow="sm" withBorder style={{ background: 'linear-gradient(135deg, rgba(255, 209, 102, 0.22), rgba(255, 140, 66, 0.1)), rgba(255, 252, 247, 0.9)' }}>
+                  <Group align="center" wrap="nowrap">
+                    <Avatar src={profile.avatar} size={76} radius="xl" />
+                    <Stack gap={4}>
+                      <SectionLabel>BattleTag</SectionLabel>
+                      <Title order={3} ff="Georgia, serif">
+                        {profile.battleTag}
+                      </Title>
+                      <Text c="dimmed">{profile.title ?? 'No player title equipped'}</Text>
+                    </Stack>
+                  </Group>
+                </Paper>
 
-              <div className="metric-grid">
-                <div className="metric-chip">
-                  <span className="stat-label">Games</span>
-                  <strong>{profile.general.games_played}</strong>
-                </div>
-                <div className="metric-chip">
-                  <span className="stat-label">Win rate</span>
-                  <strong>{profile.general.winrate.toFixed(1)}%</strong>
-                </div>
-                <div className="metric-chip">
-                  <span className="stat-label">KDA</span>
-                  <strong>{profile.general.kda.toFixed(2)}</strong>
-                </div>
-                <div className="metric-chip">
-                  <span className="stat-label">Time played</span>
-                  <strong>{formatSeconds(profile.general.time_played)}</strong>
-                </div>
-              </div>
-            </article>
+                <MetricCard
+                  label="Current Season"
+                  value={profile.currentSeason ? `Season ${profile.currentSeason}` : 'Unavailable'}
+                  hint={`Main role by playtime: ${profile.headlineRole}`}
+                />
 
-            <article className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Current comp ranks</p>
-                  <h2>Queue placements</h2>
-                </div>
-              </div>
+                <Paper radius="28px" p="xl" shadow="sm" withBorder>
+                  <Stack gap={4}>
+                    <SectionLabel>Profile Snapshot</SectionLabel>
+                    <Title order={3} ff="Georgia, serif">
+                      Endorsement {profile.endorsementLevel}
+                    </Title>
+                    <Text c="dimmed" fz="sm">
+                      Last updated: {formatDate(profile.lastUpdatedAt)}
+                    </Text>
+                    <Badge color={isCachedProfile ? 'blue' : 'orange'} variant="light" radius="sm" w="fit-content">
+                      {isCachedProfile ? `Cached at ${formatClientDate(profile.cachedAt)}` : 'Fresh API response'}
+                    </Badge>
+                  </Stack>
+                </Paper>
+              </SimpleGrid>
 
-              <div className="rank-list">
-                {profile.currentRanks.map((entry) => (
-                  <div className="rank-card" key={entry.role}>
-                    <span className="stat-label">{entry.role}</span>
-                    <strong>{entry.rank}</strong>
-                  </div>
-                ))}
-              </div>
-            </article>
-          </section>
+              <Grid gap="lg">
+                <Grid.Col span={{ base: 12, lg: 7 }}>
+                  <Paper radius="28px" p="xl" withBorder shadow="sm">
+                    <Stack gap="lg">
+                      <Group justify="space-between" align="start">
+                        <div>
+                          <SectionLabel>Competitive Summary</SectionLabel>
+                          <Title order={2} ff="Georgia, serif">
+                            Live profile snapshot
+                          </Title>
+                        </div>
+                        <Text c="dimmed" maw={220} ta="right" fz="sm">
+                          PC competitive stats from the public career profile.
+                        </Text>
+                      </Group>
 
-          <section className="content-grid">
-            <article className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Role splits</p>
-                  <h2>Where the games go</h2>
-                </div>
-                <p className="panel-note">Sorted by time played in competitive on PC.</p>
-              </div>
+                      <Text c="dimmed">{profile.summary}</Text>
 
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Role</th>
-                      <th>Games</th>
-                      <th>Win rate</th>
-                      <th>KDA</th>
-                      <th>Damage / 10</th>
-                      <th>Healing / 10</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {profile.roleRows.map((row) => (
-                      <tr key={row.role}>
-                        <td>{row.role}</td>
-                        <td>{row.bucket.games_played}</td>
-                        <td>{row.bucket.winrate.toFixed(1)}%</td>
-                        <td>{row.bucket.kda.toFixed(2)}</td>
-                        <td>{row.bucket.average.damage.toLocaleString()}</td>
-                        <td>{row.bucket.average.healing.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </article>
+                      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                        <MetricCard label="Games" value={String(profile.general.gamesPlayed)} />
+                        <MetricCard label="Win Rate" value={`${profile.general.winrate.toFixed(1)}%`} />
+                        <MetricCard label="KDA" value={profile.general.kda.toFixed(2)} />
+                        <MetricCard label="Time Played" value={formatSeconds(profile.general.timePlayed)} />
+                      </SimpleGrid>
+                    </Stack>
+                  </Paper>
+                </Grid.Col>
 
-            <article className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">Top heroes</p>
-                  <h2>Most played picks</h2>
-                </div>
-              </div>
+                <Grid.Col span={{ base: 12, lg: 5 }}>
+                  <Paper radius="28px" p="xl" withBorder shadow="sm">
+                    <Stack gap="lg">
+                      <div>
+                        <SectionLabel>Current Comp Ranks</SectionLabel>
+                        <Title order={2} ff="Georgia, serif">
+                          Queue placements
+                        </Title>
+                      </div>
 
-              <div className="insight-list">
-                {profile.heroRows.map((row) => (
-                  <div className="insight-card" key={row.hero}>
-                    <span className="stat-label">{row.hero}</span>
-                    <strong>{formatSeconds(row.bucket.time_played)}</strong>
-                    <p>
-                      {row.bucket.games_played} games, {row.bucket.winrate.toFixed(1)}% win rate, {row.bucket.average.damage.toLocaleString()} damage / 10
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </article>
-          </section>
+                      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                        {profile.currentRanks.map((entry) => (
+                          <MetricCard key={entry.role} label={entry.role} value={entry.rank} />
+                        ))}
+                      </SimpleGrid>
+                    </Stack>
+                  </Paper>
+                </Grid.Col>
+              </Grid>
 
-          <section className="panel season-table-panel">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">Overall totals</p>
-                <h2>Competitive output</h2>
-              </div>
-              <p className="panel-note">All values here come from the live public profile snapshot for the selected player.</p>
-            </div>
+              <Grid gap="lg">
+                <Grid.Col span={{ base: 12, lg: 7 }}>
+                  <Paper radius="28px" p="xl" withBorder shadow="sm">
+                    <Stack gap="lg">
+                      <Group justify="space-between" align="start">
+                        <div>
+                          <SectionLabel>Role Splits</SectionLabel>
+                          <Title order={2} ff="Georgia, serif">
+                            Where the games go
+                          </Title>
+                        </div>
+                        <Text c="dimmed" maw={220} ta="right" fz="sm">
+                          Sorted by time played in competitive on PC.
+                        </Text>
+                      </Group>
 
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Metric</th>
-                    <th>Total</th>
-                    <th>Per 10</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Eliminations</td>
-                    <td>{profile.general.total.eliminations.toLocaleString()}</td>
-                    <td>{profile.general.average.eliminations.toFixed(2)}</td>
-                  </tr>
-                  <tr>
-                    <td>Assists</td>
-                    <td>{profile.general.total.assists.toLocaleString()}</td>
-                    <td>{profile.general.average.assists.toFixed(2)}</td>
-                  </tr>
-                  <tr>
-                    <td>Deaths</td>
-                    <td>{profile.general.total.deaths.toLocaleString()}</td>
-                    <td>{profile.general.average.deaths.toFixed(2)}</td>
-                  </tr>
-                  <tr>
-                    <td>Damage</td>
-                    <td>{profile.general.total.damage.toLocaleString()}</td>
-                    <td>{profile.general.average.damage.toLocaleString()}</td>
-                  </tr>
-                  <tr>
-                    <td>Healing</td>
-                    <td>{profile.general.total.healing.toLocaleString()}</td>
-                    <td>{profile.general.average.healing.toLocaleString()}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </>
-      ) : status === 'loading' ? (
-        <section className="panel message-panel">
-          <p className="eyebrow">Loading</p>
-          <h2>Pulling live career data</h2>
-          <p className="panel-note">Searching the BattleTag, then loading the public competitive summary and hero splits.</p>
-        </section>
-      ) : null}
-    </main>
+                      <Table.ScrollContainer minWidth={720}>
+                        <Table highlightOnHover verticalSpacing="md">
+                          <Table.Thead>
+                            <Table.Tr>
+                              <Table.Th>Role</Table.Th>
+                              <Table.Th>Games</Table.Th>
+                              <Table.Th>Win rate</Table.Th>
+                              <Table.Th>KDA</Table.Th>
+                              <Table.Th>Damage / 10</Table.Th>
+                              <Table.Th>Healing / 10</Table.Th>
+                            </Table.Tr>
+                          </Table.Thead>
+                          <Table.Tbody>
+                            {profile.roleRows.map((row) => (
+                              <Table.Tr key={row.role}>
+                                <Table.Td>{row.role}</Table.Td>
+                                <Table.Td>{row.bucket.gamesPlayed}</Table.Td>
+                                <Table.Td>{row.bucket.winrate.toFixed(1)}%</Table.Td>
+                                <Table.Td>{row.bucket.kda.toFixed(2)}</Table.Td>
+                                <Table.Td>{row.bucket.average.damage.toLocaleString()}</Table.Td>
+                                <Table.Td>{row.bucket.average.healing.toLocaleString()}</Table.Td>
+                              </Table.Tr>
+                            ))}
+                          </Table.Tbody>
+                        </Table>
+                      </Table.ScrollContainer>
+                    </Stack>
+                  </Paper>
+                </Grid.Col>
+
+                <Grid.Col span={{ base: 12, lg: 5 }}>
+                  <Paper radius="28px" p="xl" withBorder shadow="sm">
+                    <Stack gap="lg">
+                      <div>
+                        <SectionLabel>Top Heroes</SectionLabel>
+                        <Title order={2} ff="Georgia, serif">
+                          Most played picks
+                        </Title>
+                      </div>
+
+                      <Stack gap="md">
+                        {profile.heroRows.map((row) => (
+                          <Paper key={row.hero} radius="xl" p="lg" bg="rgba(248, 242, 232, 0.9)" withBorder>
+                            <Stack gap={6}>
+                              <Text c="dimmed" tt="uppercase" fw={600} fz="0.72rem" style={{ letterSpacing: '0.12em' }}>
+                                {row.hero}
+                              </Text>
+                              <Title order={3} ff="Georgia, serif">
+                                {formatSeconds(row.bucket.timePlayed)}
+                              </Title>
+                              <Text c="dimmed" fz="sm">
+                                {row.bucket.gamesPlayed} games, {row.bucket.winrate.toFixed(1)}% win rate, {row.bucket.average.damage.toLocaleString()} damage / 10
+                              </Text>
+                            </Stack>
+                          </Paper>
+                        ))}
+                      </Stack>
+                    </Stack>
+                  </Paper>
+                </Grid.Col>
+              </Grid>
+
+              <Paper radius="28px" p="xl" withBorder shadow="sm">
+                <Stack gap="lg">
+                  <Group justify="space-between" align="start">
+                    <div>
+                      <SectionLabel>Overall Totals</SectionLabel>
+                      <Title order={2} ff="Georgia, serif">
+                        Competitive output
+                      </Title>
+                    </div>
+                    <Text c="dimmed" maw={260} ta="right" fz="sm">
+                      All values here come from the live public profile snapshot for the selected player.
+                    </Text>
+                  </Group>
+
+                  <Table.ScrollContainer minWidth={520}>
+                    <Table highlightOnHover verticalSpacing="md">
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>Metric</Table.Th>
+                          <Table.Th>Total</Table.Th>
+                          <Table.Th>Per 10</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        <Table.Tr>
+                          <Table.Td>Eliminations</Table.Td>
+                          <Table.Td>{profile.general.total.eliminations.toLocaleString()}</Table.Td>
+                          <Table.Td>{profile.general.average.eliminations.toFixed(2)}</Table.Td>
+                        </Table.Tr>
+                        <Table.Tr>
+                          <Table.Td>Assists</Table.Td>
+                          <Table.Td>{profile.general.total.assists.toLocaleString()}</Table.Td>
+                          <Table.Td>{profile.general.average.assists.toFixed(2)}</Table.Td>
+                        </Table.Tr>
+                        <Table.Tr>
+                          <Table.Td>Deaths</Table.Td>
+                          <Table.Td>{profile.general.total.deaths.toLocaleString()}</Table.Td>
+                          <Table.Td>{profile.general.average.deaths.toFixed(2)}</Table.Td>
+                        </Table.Tr>
+                        <Table.Tr>
+                          <Table.Td>Damage</Table.Td>
+                          <Table.Td>{profile.general.total.damage.toLocaleString()}</Table.Td>
+                          <Table.Td>{profile.general.average.damage.toLocaleString()}</Table.Td>
+                        </Table.Tr>
+                        <Table.Tr>
+                          <Table.Td>Healing</Table.Td>
+                          <Table.Td>{profile.general.total.healing.toLocaleString()}</Table.Td>
+                          <Table.Td>{profile.general.average.healing.toLocaleString()}</Table.Td>
+                        </Table.Tr>
+                      </Table.Tbody>
+                    </Table>
+                  </Table.ScrollContainer>
+                </Stack>
+              </Paper>
+            </>
+          ) : null}
+        </Stack>
+      </Container>
+    </Box>
   )
 }
 
